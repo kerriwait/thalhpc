@@ -1,0 +1,725 @@
+diff -crB original_sysstat-10.0.3//pidstat.c updated_sysstat-10.0.3//pidstat.c
+*** original_sysstat-10.0.3//pidstat.c	2011-11-21 01:38:04.000000000 +1000
+--- updated_sysstat-10.0.3//pidstat.c	2012-02-01 15:29:54.372531002 +1000
+***************
+*** 254,260 ****
+  		p = pst->comm;
+  	}
+  
+! 	printf("  %s%s\n", pst->tgid ? "|__" : "", p);
+  }
+  
+  /*
+--- 254,260 ----
+  		p = pst->comm;
+  	}
+  
+! 	printf("%s%s,%s\n", pst->tgid ? "|__" : "", pst->comm, strlen(pst->cmdline) ? pst->cmdline : pst->comm);
+  }
+  
+  /*
+***************
+*** 358,363 ****
+--- 358,364 ----
+  {
+  	FILE *fp;
+  	char filename[128], line[256];
++ 	char tempstring[12];
+  
+  	if (tgid) {
+  		sprintf(filename, TASK_STATUS, tgid, pid);
+***************
+*** 378,383 ****
+--- 378,386 ----
+  		else if (!strncmp(line, "nonvoluntary_ctxt_switches:", 27)) {
+  			sscanf(line + 28, "%lu", &pst->nivcsw);
+  		}
++ 		else if (!strncmp(line, "Uid:", 4)) {
++ 			sscanf(line , "%s\t%lu",  tempstring, &pst->uid);
++ 		}
+  	}
+  
+  	fclose(fp);
+***************
+*** 1052,1066 ****
+  		
+  		if (pst->tgid) {
+  			/* This is a TID */
+! 			sprintf(format, "         %c %%9u", c);
+  		}
+  		else {
+  			/* This is a PID (TGID) */
+! 			sprintf(format, " %%9u         %c", c);
+  		}
+  	}
+  	else {
+! 		strcpy(format, " %9u");
+  	}
+  
+  	printf(format, pst->pid);
+--- 1055,1069 ----
+  		
+  		if (pst->tgid) {
+  			/* This is a TID */
+! 			sprintf(format, "%c,%%u", c);
+  		}
+  		else {
+  			/* This is a PID (TGID) */
+! 			sprintf(format, "%%u,%c", c);
+  		}
+  	}
+  	else {
+! 		strcpy(format, "%u");
+  	}
+  
+  	printf(format, pst->pid);
+***************
+*** 1077,1083 ****
+   */
+  void print_line_id(char *timestamp, struct pid_stats *pst)
+  {
+! 	printf("%-11s", timestamp);
+  	
+  	__print_line_id(pst, '-');
+  }
+--- 1080,1086 ----
+   */
+  void print_line_id(char *timestamp, struct pid_stats *pst)
+  {
+! 	printf("%-11s,", timestamp);
+  	
+  	__print_line_id(pst, '-');
+  }
+***************
+*** 1108,1130 ****
+  	int again = 0;
+  
+  	if (dis) {
+! 		PRINT_ID_HDR("#      Time", pidflag);
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf("    %%usr %%system  %%guest    %%CPU   CPU");
+  		}
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf("  minflt/s  majflt/s     VSZ    RSS   %%MEM");
+  		}
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf(" StkSize  StkRef");
+  		}
+  		if (DISPLAY_IO(actflag)) {
+! 			printf("   kB_rd/s   kB_wr/s kB_ccwr/s");
+  		}
+  		if (DISPLAY_CTXSW(actflag)) {
+! 			printf("   cswch/s nvcswch/s");
+  		}
+! 		printf("  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1111,1133 ----
+  	int again = 0;
+  
+  	if (dis) {
+! 		PRINT_ID_HDR("Time", pidflag);
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf(",%%usr,%%system,%%guest,%%CPU,usr-ms,sys-ms,guest-ms,CPU,");
+  		}
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf("minflt/s,majflt/s,VSZ,RSS,%%MEM,");
+  		}
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf("StkSize,StkRef,");
+  		}
+  		if (DISPLAY_IO(actflag)) {
+! 			printf("kB_rd/s,kB_wr/s,kB_ccwr/s,");
+  		}
+  		if (DISPLAY_CTXSW(actflag)) {
+! 			printf("cswch/s,nvcswch/s,");
+  		}
+! 		printf("Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1133,1144 ****
+  				       &pstc, &pstp) <= 0)
+  			continue;
+  
+! 		printf("%11ld", (long) time(NULL));
+  		__print_line_id(pstc, '0');
+  
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf(" %7.2f %7.2f %7.2f %7.2f",
+! 			       (pstc->utime - pstc->gtime) < (pstp->utime - pstp->gtime) ?
+  			       0.0 :
+  			       SP_VALUE(pstp->utime - pstp->gtime,
+  					pstc->utime - pstc->gtime, itv),
+--- 1136,1147 ----
+  				       &pstc, &pstp) <= 0)
+  			continue;
+  
+! 		printf("%11ld,", (long) time(NULL));
+  		__print_line_id(pstc, '0');
+  
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf(",%lu,%.2f,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,",
+! 			       pstc->uid,(pstc->utime - pstc->gtime) < (pstp->utime - pstp->gtime) ?
+  			       0.0 :
+  			       SP_VALUE(pstp->utime - pstp->gtime,
+  					pstc->utime - pstc->gtime, itv),
+***************
+*** 1149,1162 ****
+  			       SP_VALUE(pstp->utime + pstp->stime,
+  					pstc->utime + pstc->stime, g_itv) :
+  			       SP_VALUE(pstp->utime + pstp->stime,
+! 					pstc->utime + pstc->stime, itv));
+  
+! 			printf("   %3d", pstc->processor);
+  		}
+  
+  
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(" %9.2f %9.2f %7lu %6lu %6.2f",
+  			       S_VALUE(pstp->minflt, pstc->minflt, itv),
+  			       S_VALUE(pstp->majflt, pstc->majflt, itv),
+  			       pstc->vsz,
+--- 1152,1175 ----
+  			       SP_VALUE(pstp->utime + pstp->stime,
+  					pstc->utime + pstc->stime, g_itv) :
+  			       SP_VALUE(pstp->utime + pstp->stime,
+! 					pstc->utime + pstc->stime, itv),
+!                                (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+! 			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+! 			       0.0 :
+! 			       (double) ((pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) -
+! 					 (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime)) /
+! 			       HZ * 1000,
+! 			       (double) ((pstc->stime + pstc->cstime) -
+! 					 (pstp->stime + pstp->cstime)) / HZ * 1000,
+! 			       (double) ((pstc->gtime + pstc->cgtime) -
+! 					 (pstp->gtime + pstp->cgtime)) / HZ * 1000);
+  
+! 			printf("%d,", pstc->processor);
+  		}
+  
+  
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf("%.2f,%.2f,%lu,%lu,%.2f,",
+  			       S_VALUE(pstp->minflt, pstc->minflt, itv),
+  			       S_VALUE(pstp->majflt, pstc->majflt, itv),
+  			       pstc->vsz,
+***************
+*** 1165,1171 ****
+  		}
+  
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf("  %6lu  %6lu",
+  			       pstc->stack_size,
+  			       pstc->stack_ref);
+  		}
+--- 1178,1184 ----
+  		}
+  
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf("%lu,%lu,",
+  			       pstc->stack_size,
+  			       pstc->stack_ref);
+  		}
+***************
+*** 1173,1179 ****
+  		if (DISPLAY_IO(actflag)) {
+  			if (!NO_PID_IO(pstc->flags))
+  			{
+! 				printf(" %9.2f %9.2f %9.2f",
+  				       S_VALUE(pstp->read_bytes,  pstc->read_bytes, itv)  / 1024,
+  				       S_VALUE(pstp->write_bytes, pstc->write_bytes, itv) / 1024,
+  				       S_VALUE(pstp->cancelled_write_bytes,
+--- 1186,1192 ----
+  		if (DISPLAY_IO(actflag)) {
+  			if (!NO_PID_IO(pstc->flags))
+  			{
+! 				printf("%.2f,%.2f,%.2f,",
+  				       S_VALUE(pstp->read_bytes,  pstc->read_bytes, itv)  / 1024,
+  				       S_VALUE(pstp->write_bytes, pstc->write_bytes, itv) / 1024,
+  				       S_VALUE(pstp->cancelled_write_bytes,
+***************
+*** 1184,1195 ****
+  				 * Keep the layout even though this task has no I/O
+  				 * typically threads with no I/O measurements.
+  				 */
+! 				printf(" %9.2f %9.2f %9.2f", -1.0, -1.0, -1.0);
+  			}
+  		}
+  
+  		if (DISPLAY_CTXSW(actflag)) {
+! 			printf(" %9.2f %9.2f",
+  			       S_VALUE(pstp->nvcsw, pstc->nvcsw, itv),
+  			       S_VALUE(pstp->nivcsw, pstc->nivcsw, itv));
+  		}
+--- 1197,1208 ----
+  				 * Keep the layout even though this task has no I/O
+  				 * typically threads with no I/O measurements.
+  				 */
+! 				printf("%.2f,%.2f,%.2f,", -1.0, -1.0, -1.0);
+  			}
+  		}
+  
+  		if (DISPLAY_CTXSW(actflag)) {
+! 			printf("%.2f,%.2f,",
+  			       S_VALUE(pstp->nvcsw, pstc->nvcsw, itv),
+  			       S_VALUE(pstp->nivcsw, pstc->nivcsw, itv));
+  		}
+***************
+*** 1224,1235 ****
+  	int again = 0;
+  
+  	if (dis) {
+! 		PRINT_ID_HDR("#      Time", pidflag);
+  		if (DISPLAY_CPU(actflag))
+! 			printf("    usr-ms system-ms  guest-ms");
+  		if (DISPLAY_MEM(actflag))
+! 			printf(" minflt-nr majflt-nr");
+! 		printf("  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1237,1248 ----
+  	int again = 0;
+  
+  	if (dis) {
+! 		PRINT_ID_HDR("Time", pidflag);
+  		if (DISPLAY_CPU(actflag))
+! 			printf(",usr-ms,system-ms,guest-ms,");
+  		if (DISPLAY_MEM(actflag))
+! 			printf(",minflt-nr,majflt-nr,");
+! 		printf("Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1242,1248 ****
+  		__print_line_id(pstc, '0');
+  
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf(" %9.0f %9.0f %9.0f",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+--- 1255,1261 ----
+  		__print_line_id(pstc, '0');
+  
+  		if (DISPLAY_CPU(actflag)) {
+! 			printf(",%9.0f,%9.0f,%9.0f,",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+***************
+*** 1257,1263 ****
+  
+  
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(" %9lu %9lu",
+  			       (pstc->minflt + pstc->cminflt) - (pstp->minflt + pstp->cminflt),
+  			       (pstc->majflt + pstc->cmajflt) - (pstp->majflt + pstp->cmajflt));
+  		}
+--- 1270,1276 ----
+  
+  
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(",%9lu,%9lu,",
+  			       (pstc->minflt + pstc->cminflt) - (pstp->minflt + pstp->cminflt),
+  			       (pstc->majflt + pstc->cmajflt) - (pstp->majflt + pstp->cmajflt));
+  		}
+***************
+*** 1304,1310 ****
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf("    %%usr %%system  %%guest    %%CPU   CPU  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1317,1323 ----
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(",%%usr,%%system,%%guest,%%CPU,CPU,Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1314,1321 ****
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(" %7.2f %7.2f %7.2f %7.2f",
+! 		       (pstc->utime - pstc->gtime) < (pstp->utime - pstp->gtime) ?
+  		       0.0 :
+  		       SP_VALUE(pstp->utime - pstp->gtime,
+  				pstc->utime - pstc->gtime, itv),
+--- 1327,1334 ----
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(",%lu,%.2f,%.2f,%.2f,%.2f,",
+! 		       pstc->uid,(pstc->utime - pstc->gtime) < (pstp->utime - pstp->gtime) ?
+  		       0.0 :
+  		       SP_VALUE(pstp->utime - pstp->gtime,
+  				pstc->utime - pstc->gtime, itv),
+***************
+*** 1329,1338 ****
+  				pstc->utime + pstc->stime, itv));
+  
+  		if (!disp_avg) {
+! 			printf("   %3d", pstc->processor);
+  		}
+  		else {
+! 			printf("     -");
+  		}
+  		print_comm(pstc);
+  		again = 1;
+--- 1342,1351 ----
+  				pstc->utime + pstc->stime, itv));
+  
+  		if (!disp_avg) {
+! 			printf("%d,", pstc->processor);
+  		}
+  		else {
+! 			printf("-,");
+  		}
+  		print_comm(pstc);
+  		again = 1;
+***************
+*** 1371,1377 ****
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf("    usr-ms system-ms  guest-ms  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1384,1390 ----
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(",usr-ms,system-ms,guest-ms,Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1392,1398 ****
+  
+  		print_line_id(curr_string, pstc);
+  		if (disp_avg) {
+! 			printf(" %9.0f %9.0f %9.0f",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+--- 1405,1411 ----
+  
+  		print_line_id(curr_string, pstc);
+  		if (disp_avg) {
+! 			printf(",%9.0f,%9.0f,%9.0f,",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+***************
+*** 1407,1413 ****
+  			       (HZ * pstc->uc_asum_count) * 1000);
+  		}
+  		else {
+! 			printf(" %9.0f %9.0f %9.0f",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+--- 1420,1426 ----
+  			       (HZ * pstc->uc_asum_count) * 1000);
+  		}
+  		else {
+! 			printf(",%9.0f,%9.0f,%9.0f,",
+  			       (pstc->utime + pstc->cutime - pstc->gtime - pstc->cgtime) <
+  			       (pstp->utime + pstp->cutime - pstp->gtime - pstp->cgtime) ?
+  			       0.0 :
+***************
+*** 1459,1470 ****
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf("  minflt/s  majflt/s     VSZ    RSS   %%MEM");
+  		}
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf(" StkSize  StkRef");
+  		}
+! 		printf("  Command\n");
+  	}
+  	
+  	for (p = 0; p < pid_nr; p++) {
+--- 1472,1483 ----
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(",minflt/s,majflt/s,VSZ,RSS,%%MEM,");
+  		}
+  		if (DISPLAY_STACK(actflag)) {
+! 			printf(",StkSize,StkRef,");
+  		}
+! 		printf("Command,CommandLine\n");
+  	}
+  	
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1494,1505 ****
+  		print_line_id(curr_string, pstc);
+  		
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(" %9.2f %9.2f ",
+  			       S_VALUE(pstp->minflt, pstc->minflt, itv),
+  			       S_VALUE(pstp->majflt, pstc->majflt, itv));
+  
+  			if (disp_avg) {
+! 				printf("%7.0f %6.0f %6.2f",
+  				       (double) pstc->total_vsz / pstc->rt_asum_count,
+  				       (double) pstc->total_rss / pstc->rt_asum_count,
+  				       tlmkb ?
+--- 1507,1518 ----
+  		print_line_id(curr_string, pstc);
+  		
+  		if (DISPLAY_MEM(actflag)) {
+! 			printf(",%9.2f,%9.2f,",
+  			       S_VALUE(pstp->minflt, pstc->minflt, itv),
+  			       S_VALUE(pstp->majflt, pstc->majflt, itv));
+  
+  			if (disp_avg) {
+! 				printf("%7.0f,%6.0f,%6.2f,",
+  				       (double) pstc->total_vsz / pstc->rt_asum_count,
+  				       (double) pstc->total_rss / pstc->rt_asum_count,
+  				       tlmkb ?
+***************
+*** 1507,1513 ****
+  				       : 0.0);
+  			}
+  			else {
+! 				printf("%7lu %6lu %6.2f",
+  				       pstc->vsz,
+  				       pstc->rss,
+  				       tlmkb ? SP_VALUE(0, pstc->rss, tlmkb) : 0.0);
+--- 1520,1526 ----
+  				       : 0.0);
+  			}
+  			else {
+! 				printf("%7lu,%6lu,%6.2f,",
+  				       pstc->vsz,
+  				       pstc->rss,
+  				       tlmkb ? SP_VALUE(0, pstc->rss, tlmkb) : 0.0);
+***************
+*** 1516,1527 ****
+  		
+  		if (DISPLAY_STACK(actflag)) {
+  			if (disp_avg) {
+! 				printf("%7.0f %7.0f",
+  				       (double) pstc->total_stack_size / pstc->rt_asum_count,
+  				       (double) pstc->total_stack_ref  / pstc->rt_asum_count);
+  			}
+  			else {
+! 				printf("%7lu %7lu",
+  				       pstc->stack_size,
+  				       pstc->stack_ref);
+  			}
+--- 1529,1540 ----
+  		
+  		if (DISPLAY_STACK(actflag)) {
+  			if (disp_avg) {
+! 				printf(",%7.0f,%7.0f,",
+  				       (double) pstc->total_stack_size / pstc->rt_asum_count,
+  				       (double) pstc->total_stack_ref  / pstc->rt_asum_count);
+  			}
+  			else {
+! 				printf("%7lu,%7lu,",
+  				       pstc->stack_size,
+  				       pstc->stack_ref);
+  			}
+***************
+*** 1564,1570 ****
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(" minflt-nr majflt-nr  Command\n");
+  	}
+  	
+  	for (p = 0; p < pid_nr; p++) {
+--- 1577,1583 ----
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(",minflt-nr,majflt-nr,Command,CommandLine\n");
+  	}
+  	
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1585,1598 ****
+  
+  		print_line_id(curr_string, pstc);
+  		if (disp_avg) {
+! 			printf(" %9.0f %9.0f",
+  			       (double) ((pstc->minflt + pstc->cminflt) -
+  					 (pstp->minflt + pstp->cminflt)) / pstc->rc_asum_count,
+  			       (double) ((pstc->majflt + pstc->cmajflt) -
+  					 (pstp->majflt + pstp->cmajflt)) / pstc->rc_asum_count);
+  		}
+  		else {
+! 			printf(" %9lu %9lu",
+  			       (pstc->minflt + pstc->cminflt) - (pstp->minflt + pstp->cminflt),
+  			       (pstc->majflt + pstc->cmajflt) - (pstp->majflt + pstp->cmajflt));
+  		}
+--- 1598,1611 ----
+  
+  		print_line_id(curr_string, pstc);
+  		if (disp_avg) {
+! 			printf(",%9.0f,%9.0f,",
+  			       (double) ((pstc->minflt + pstc->cminflt) -
+  					 (pstp->minflt + pstp->cminflt)) / pstc->rc_asum_count,
+  			       (double) ((pstc->majflt + pstc->cmajflt) -
+  					 (pstp->majflt + pstp->cmajflt)) / pstc->rc_asum_count);
+  		}
+  		else {
+! 			printf(",%9lu,%9lu,",
+  			       (pstc->minflt + pstc->cminflt) - (pstp->minflt + pstp->cminflt),
+  			       (pstc->majflt + pstc->cmajflt) - (pstp->majflt + pstp->cmajflt));
+  		}
+***************
+*** 1634,1640 ****
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf("   kB_rd/s   kB_wr/s kB_ccwr/s  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1647,1653 ----
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(",kB_rd/s,kB_wr/s,kB_ccwr/s,Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1644,1650 ****
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(" %9.2f %9.2f %9.2f",
+  		       S_VALUE(pstp->read_bytes,  pstc->read_bytes, itv)  / 1024,
+  		       S_VALUE(pstp->write_bytes, pstc->write_bytes, itv) / 1024,
+  		       S_VALUE(pstp->cancelled_write_bytes,
+--- 1657,1663 ----
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(",%9.2f,%9.2f,%9.2f,",
+  		       S_VALUE(pstp->read_bytes,  pstc->read_bytes, itv)  / 1024,
+  		       S_VALUE(pstp->write_bytes, pstc->write_bytes, itv) / 1024,
+  		       S_VALUE(pstp->cancelled_write_bytes,
+***************
+*** 1687,1693 ****
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf("   cswch/s nvcswch/s  Command\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+--- 1700,1706 ----
+  
+  	if (dis) {
+  		PRINT_ID_HDR(prev_string, pidflag);
+! 		printf(",cswch/s,nvcswch/s,Command,CommandLine\n");
+  	}
+  
+  	for (p = 0; p < pid_nr; p++) {
+***************
+*** 1697,1703 ****
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(" %9.2f %9.2f",
+  		       S_VALUE(pstp->nvcsw, pstc->nvcsw, itv),
+  		       S_VALUE(pstp->nivcsw, pstc->nivcsw, itv));
+  		print_comm(pstc);
+--- 1710,1716 ----
+  			continue;
+  	
+  		print_line_id(curr_string, pstc);
+! 		printf(",%9.2f,%9.2f,",
+  		       S_VALUE(pstp->nvcsw, pstc->nvcsw, itv),
+  		       S_VALUE(pstp->nivcsw, pstc->nivcsw, itv));
+  		print_comm(pstc);
+***************
+*** 1819,1825 ****
+  {
+  	char string[16];
+  
+! 	strncpy(string, _("Average:"), 16);
+  	string[15] = '\0';
+  	write_stats_core(2, curr, dis, TRUE, string, string);
+  }
+--- 1832,1838 ----
+  {
+  	char string[16];
+  
+! 	strncpy(string, _("Average,"), 16);
+  	string[15] = '\0';
+  	write_stats_core(2, curr, dis, TRUE, string, string);
+  }
+diff -crB original_sysstat-10.0.3//pidstat.h updated_sysstat-10.0.3//pidstat.h
+*** original_sysstat-10.0.3//pidstat.h	2011-11-21 01:38:05.000000000 +1000
+--- updated_sysstat-10.0.3//pidstat.h	2012-02-01 15:00:59.000000000 +1000
+***************
+*** 16,22 ****
+  #define NR_PID_PREALLOC	10
+  
+  #define MAX_COMM_LEN	128
+! #define MAX_CMDLINE_LEN	128
+  
+  /* Activities */
+  #define P_A_CPU		0x01
+--- 16,22 ----
+  #define NR_PID_PREALLOC	10
+  
+  #define MAX_COMM_LEN	128
+! #define MAX_CMDLINE_LEN	256
+  
+  /* Activities */
+  #define P_A_CPU		0x01
+***************
+*** 80,89 ****
+  #define PRINT_ID_HDR(_timestamp_, _flag_)	do {						\
+  							printf("\n%-11s", _timestamp_);		\
+     							if (DISPLAY_TID(_flag_)) {		\
+! 								printf("      TGID       TID");	\
+  							}					\
+  							else {					\
+! 								printf("       PID");		\
+  							}					\
+  						} while (0)
+  
+--- 80,89 ----
+  #define PRINT_ID_HDR(_timestamp_, _flag_)	do {						\
+  							printf("\n%-11s", _timestamp_);		\
+     							if (DISPLAY_TID(_flag_)) {		\
+! 								printf(",TGID,TID,UID");	\
+  							}					\
+  							else {					\
+! 								printf(",PID,UID");		\
+  							}					\
+  						} while (0)
+  
+***************
+*** 111,116 ****
+--- 111,117 ----
+  	unsigned long      nivcsw			__attribute__ ((packed));
+  	unsigned long      stack_size			__attribute__ ((packed));
+  	unsigned long      stack_ref			__attribute__ ((packed));
++ 	unsigned long      uid				__attribute__ ((packed));
+  	/* If pid is null, the process has terminated */
+  	unsigned int       pid				__attribute__ ((packed));
+  	/* If tgid is not null, then this PID is in fact a TID */
